@@ -1,4 +1,3 @@
-
 name: Admin | Playwright Tests
 
 on:
@@ -270,6 +269,37 @@ jobs:
 
 
       # =========================================================
+      # Verify Allure Raw Results
+      # =========================================================
+
+      - name: Verify Allure Results
+        if: always()
+        working-directory: packages/Webkul/Admin
+        run: |
+
+          echo "======================================"
+          echo "Allure Results"
+          echo "======================================"
+
+          if [ -d "allure-results" ]; then
+
+            echo "Allure results directory found."
+
+            echo "Total files:"
+            find allure-results -type f | wc -l
+
+            echo ""
+            echo "Result files:"
+            find allure-results -type f | head -30
+
+          else
+
+            echo "❌ Allure results directory NOT found."
+
+          fi
+
+
+      # =========================================================
       # Upload Allure Raw Results
       # =========================================================
 
@@ -371,6 +401,37 @@ jobs:
 
 
       # =========================================================
+      # Verify Downloaded Web Results
+      # =========================================================
+
+      - name: Verify Web Allure Results
+
+        run: |
+
+          echo "======================================"
+          echo "Web Allure Raw Results"
+          echo "======================================"
+
+          if [ ! -d "allure-results-web" ]; then
+            echo "❌ Web Allure results directory not found."
+            exit 1
+          fi
+
+          TOTAL_FILES=$(find allure-results-web -type f | wc -l)
+
+          echo "Total files: $TOTAL_FILES"
+
+          if [ "$TOTAL_FILES" -eq 0 ]; then
+            echo "❌ No Web Allure result files found."
+            exit 1
+          fi
+
+          echo ""
+          echo "Sample files:"
+          find allure-results-web -type f | head -30
+
+
+      # =========================================================
       # Generate Web Allure Report
       # =========================================================
 
@@ -378,22 +439,46 @@ jobs:
 
         run: |
 
-          if [ -d "allure-results-web" ] && [ "$(find allure-results-web -type f | wc -l)" -gt 0 ]; then
-
-            allure generate \
-              allure-results-web \
-              --clean \
-              -o allure-report-web
-
-          else
-
-            echo "No Web Allure results found."
-
-          fi
+          allure generate \
+            allure-results-web \
+            --clean \
+            -o allure-report-web
 
 
       # =========================================================
-      # Upload Web Allure Report
+      # Verify Web Allure HTML Report
+      # =========================================================
+
+      - name: Verify Web Allure Report
+
+        run: |
+
+          echo "======================================"
+          echo "Web Allure HTML Report"
+          echo "======================================"
+
+          if [ ! -d "allure-report-web" ]; then
+            echo "❌ Web Allure report directory not found."
+            exit 1
+          fi
+
+          if [ ! -f "allure-report-web/index.html" ]; then
+            echo "❌ Web Allure index.html NOT found."
+            echo ""
+            echo "Generated files:"
+            find allure-report-web -maxdepth 2 -type f | head -50
+            exit 1
+          fi
+
+          echo "✅ Web Allure index.html found."
+
+          echo ""
+          echo "Report files:"
+          find allure-report-web -maxdepth 2 -type f | head -30
+
+
+      # =========================================================
+      # Upload Web Allure HTML Report
       # =========================================================
 
       - name: Upload Web Allure Report
@@ -408,7 +493,7 @@ jobs:
 
           path: allure-report-web
 
-          if-no-files-found: warn
+          if-no-files-found: error
 
           retention-days: 7
 
@@ -470,6 +555,37 @@ jobs:
 
 
       # =========================================================
+      # Verify Downloaded Mobile Results
+      # =========================================================
+
+      - name: Verify Mobile Allure Results
+
+        run: |
+
+          echo "======================================"
+          echo "Mobile Allure Raw Results"
+          echo "======================================"
+
+          if [ ! -d "allure-results-mobile" ]; then
+            echo "❌ Mobile Allure results directory not found."
+            exit 1
+          fi
+
+          TOTAL_FILES=$(find allure-results-mobile -type f | wc -l)
+
+          echo "Total files: $TOTAL_FILES"
+
+          if [ "$TOTAL_FILES" -eq 0 ]; then
+            echo "❌ No Mobile Allure result files found."
+            exit 1
+          fi
+
+          echo ""
+          echo "Sample files:"
+          find allure-results-mobile -type f | head -30
+
+
+      # =========================================================
       # Generate Mobile Allure Report
       # =========================================================
 
@@ -477,22 +593,46 @@ jobs:
 
         run: |
 
-          if [ -d "allure-results-mobile" ] && [ "$(find allure-results-mobile -type f | wc -l)" -gt 0 ]; then
-
-            allure generate \
-              allure-results-mobile \
-              --clean \
-              -o allure-report-mobile
-
-          else
-
-            echo "No Mobile Allure results found."
-
-          fi
+          allure generate \
+            allure-results-mobile \
+            --clean \
+            -o allure-report-mobile
 
 
       # =========================================================
-      # Upload Mobile Allure Report
+      # Verify Mobile Allure HTML Report
+      # =========================================================
+
+      - name: Verify Mobile Allure Report
+
+        run: |
+
+          echo "======================================"
+          echo "Mobile Allure HTML Report"
+          echo "======================================"
+
+          if [ ! -d "allure-report-mobile" ]; then
+            echo "❌ Mobile Allure report directory not found."
+            exit 1
+          fi
+
+          if [ ! -f "allure-report-mobile/index.html" ]; then
+            echo "❌ Mobile Allure index.html NOT found."
+            echo ""
+            echo "Generated files:"
+            find allure-report-mobile -maxdepth 2 -type f | head -50
+            exit 1
+          fi
+
+          echo "✅ Mobile Allure index.html found."
+
+          echo ""
+          echo "Report files:"
+          find allure-report-mobile -maxdepth 2 -type f | head -30
+
+
+      # =========================================================
+      # Upload Mobile Allure HTML Report
       # =========================================================
 
       - name: Upload Mobile Allure Report
@@ -507,6 +647,7 @@ jobs:
 
           path: allure-report-mobile
 
-          if-no-files-found: warn
+          if-no-files-found: error
 
           retention-days: 7
+

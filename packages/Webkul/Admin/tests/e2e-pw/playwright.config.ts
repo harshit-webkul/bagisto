@@ -13,7 +13,7 @@ export const ADMIN_AUTH_STATE_PATH = `${STATE_DIR_PATH}/admin-auth.json`;
 dotenv.config({
     path: path.resolve(__dirname, "../../../../../.env"),
 });
-
+configuration/general/design.spec.ts
 export default defineConfig({
     testDir: "./tests",
 
