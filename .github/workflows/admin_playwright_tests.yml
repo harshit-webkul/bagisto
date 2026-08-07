@@ -273,8 +273,11 @@ jobs:
       # =========================================================
 
       - name: Verify Allure Results
+
         if: always()
+
         working-directory: packages/Webkul/Admin
+
         run: |
 
           echo "======================================"
@@ -362,12 +365,12 @@ jobs:
 
     steps:
 
-
       # =========================================================
       # Setup Node.js
       # =========================================================
 
       - name: Setup Node.js
+
         uses: actions/setup-node@v4
 
         with:
@@ -375,10 +378,24 @@ jobs:
 
 
       # =========================================================
+      # Setup Java
+      # =========================================================
+
+      - name: Setup Java
+
+        uses: actions/setup-java@v4
+
+        with:
+          distribution: temurin
+          java-version: "17"
+
+
+      # =========================================================
       # Install Allure Commandline
       # =========================================================
 
       - name: Install Allure Commandline
+
         run: |
           npm install -g allure-commandline
 
@@ -392,11 +409,8 @@ jobs:
         uses: actions/download-artifact@v4
 
         with:
-
           pattern: allure-chromium-shard-*
-
           path: allure-results-web
-
           merge-multiple: true
 
 
@@ -516,12 +530,12 @@ jobs:
 
     steps:
 
-
       # =========================================================
       # Setup Node.js
       # =========================================================
 
       - name: Setup Node.js
+
         uses: actions/setup-node@v4
 
         with:
@@ -529,10 +543,24 @@ jobs:
 
 
       # =========================================================
+      # Setup Java
+      # =========================================================
+
+      - name: Setup Java
+
+        uses: actions/setup-java@v4
+
+        with:
+          distribution: temurin
+          java-version: "17"
+
+
+      # =========================================================
       # Install Allure Commandline
       # =========================================================
 
       - name: Install Allure Commandline
+
         run: |
           npm install -g allure-commandline
 
@@ -546,11 +574,8 @@ jobs:
         uses: actions/download-artifact@v4
 
         with:
-
           pattern: allure-mobile-chrome-shard-*
-
           path: allure-results-mobile
-
           merge-multiple: true
 
 
@@ -650,4 +675,3 @@ jobs:
           if-no-files-found: error
 
           retention-days: 7
-

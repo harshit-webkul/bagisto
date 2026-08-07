@@ -13,7 +13,7 @@ export const ADMIN_AUTH_STATE_PATH = `${STATE_DIR_PATH}/admin-auth.json`;
 dotenv.config({
     path: path.resolve(__dirname, "../../../../../.env"),
 });
-configuration/general/design.spec.ts
+
 export default defineConfig({
     testDir: "./tests",
 
@@ -37,7 +37,6 @@ export default defineConfig({
 
     reporter: [
         ["list"],
-
         [
             "allure-playwright",
             {
@@ -50,40 +49,26 @@ export default defineConfig({
 
     use: {
         baseURL: `${process.env.APP_URL}/`.replace(/\/+$/, "/"),
-
         screenshot: {
             mode: "only-on-failure",
             fullPage: true,
         },
-
         video: "retain-on-failure",
-
         trace: "retain-on-failure",
     },
 
     projects: [
-        // =====================================================
-        // Desktop Chrome
-        // =====================================================
-
         {
             name: "chromium",
-
             use: {
                 ...devices["Desktop Chrome"],
             },
         },
 
-        // =====================================================
-        // Mobile Chrome
-        // =====================================================
-
         {
             name: "mobile-chrome",
-
             use: {
                 ...devices["Pixel 5"],
-
                 viewport: {
                     width: 375,
                     height: 812,
