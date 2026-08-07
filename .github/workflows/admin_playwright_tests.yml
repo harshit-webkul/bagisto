@@ -130,7 +130,7 @@ jobs:
       # =========================================================
 
       - name: Install Node.js Dependencies
-        run: npm ci
+        run: npm install
         working-directory: packages/Webkul/Admin
 
 
