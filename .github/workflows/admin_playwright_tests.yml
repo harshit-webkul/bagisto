@@ -18,10 +18,15 @@ jobs:
         operating-systems: [ubuntu-latest]
         php-versions: ["8.3"]
         node-version: ["22.13.1"]
+
+        browser: [chromium, mobile-chrome]
+
         shard-index: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
         shard-total: [10]
 
-    name: Admin | Playwright Tests | Shard ${{ matrix.shard-index }} Of ${{ matrix.shard-total }}
+    name: >
+      Admin | ${{ matrix.browser }} |
+      Shard ${{ matrix.shard-index }} Of ${{ matrix.shard-total }}
 
     services:
       mysql:
@@ -31,7 +36,11 @@ jobs:
           MYSQL_DATABASE: bagisto
         ports:
           - 3306
-        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=5
+        options: >-
+          --health-cmd="mysqladmin ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
 
     steps:
       - name: Checkout
@@ -63,6 +72,7 @@ jobs:
       - name: Setting Environment
         run: |
           cp .env.example .env
+
           sed -i "s|^\(DB_HOST=\s*\).*$|\1127.0.0.1|" .env
           sed -i "s|^\(DB_PORT=\s*\).*$|\1${{ job.services.mysql.ports['3306'] }}|" .env
           sed -i "s|^\(DB_DATABASE=\s*\).*$|\1bagisto|" .env
@@ -70,6 +80,7 @@ jobs:
           sed -i "s|^\(DB_PASSWORD=\s*\).*$|\1root|" .env
           sed -i "s|^\(APP_DEBUG=\s*\).*$|\1false|" .env
           sed -i "s|^\(APP_URL=\s*\).*$|\1http://127.0.0.1:8000|" .env
+
           cat .env
 
       - name: Install Composer Dependencies
@@ -87,23 +98,167 @@ jobs:
       - name: Start Laravel server
         run: |
           php artisan serve --host=0.0.0.0 --port=8000 > server.log 2>&1 &
-          echo "Waiting for server to start..."
-          timeout 30 bash -c 'until curl -s http://127.0.0.1:8000 > /dev/null; do sleep 1; done'
 
-      - name: Run All Playwright Tests
+          echo "Waiting for server to start..."
+
+          timeout 30 bash -c \
+            'until curl -s http://127.0.0.1:8000 > /dev/null; do sleep 1; done'
+
+      # ---------------------------------------------------------
+      # Run Playwright Tests
+      # ---------------------------------------------------------
+
+      - name: Run Playwright Tests
+        if: always()
         env:
           BASE_URL: "http://127.0.0.1:8000"
+          ALLURE_RESULTS_DIR: "./allure-results"
         run: |
-          npx playwright test --config=tests/e2e-pw/playwright.config.ts --shard=${{ matrix.shard-index }}/${{ matrix.shard-total }}
+          npx playwright test \
+            --config=tests/e2e-pw/playwright.config.ts \
+            --project=${{ matrix.browser }} \
+            --shard=${{ matrix.shard-index }}/${{ matrix.shard-total }}
         working-directory: packages/Webkul/Admin
 
-      - name: Upload Test Results
-        uses: actions/upload-artifact@v4
+      # ---------------------------------------------------------
+      # Upload Allure Results
+      # ---------------------------------------------------------
+
+      - name: Upload Allure Results
         if: always()
+        uses: actions/upload-artifact@v4
         with:
-          name: test-results-${{ matrix.shard-index }}-${{ github.run_id }}-${{ github.run_number }}
+          name: allure-${{ matrix.browser }}-shard-${{ matrix.shard-index }}
+          path: packages/Webkul/Admin/allure-results
+          retention-days: 7
+
+      # ---------------------------------------------------------
+      # Upload Playwright Debug Results
+      # ---------------------------------------------------------
+
+      - name: Upload Playwright Test Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-${{ matrix.browser }}-shard-${{ matrix.shard-index }}
           path: |
-            packages/Webkul/Admin/tests/e2e-pw/playwright-report
             packages/Webkul/Admin/tests/e2e-pw/test-results
             storage/logs/laravel.log
-          retention-days: 1
+            packages/Webkul/Admin/server.log
+          retention-days: 7
+
+
+  # =============================================================
+  # Generate Web Allure Report
+  # =============================================================
+
+  web_allure_report:
+    if: always()
+    needs: admin_playwright_test
+
+    runs-on: ubuntu-latest
+
+    name: Admin | Generate Web Allure Report
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.13.1"
+
+      - name: Install Allure Commandline
+        run: npm install -D allure-commandline
+
+      # ---------------------------------------------------------
+      # Download all 10 Web shard results
+      # ---------------------------------------------------------
+
+      - name: Download Web Allure Results
+        uses: actions/download-artifact@v4
+        with:
+          pattern: allure-chromium-shard-*
+          path: packages/Webkul/Admin/allure-results-web
+          merge-multiple: true
+
+      # ---------------------------------------------------------
+      # Generate Web Allure Report
+      # ---------------------------------------------------------
+
+      - name: Generate Web Allure Report
+        run: |
+          npx allure generate \
+            packages/Webkul/Admin/allure-results-web \
+            --clean \
+            -o packages/Webkul/Admin/allure-report-web
+
+      # ---------------------------------------------------------
+      # Upload Web Allure Report
+      # ---------------------------------------------------------
+
+      - name: Upload Web Allure Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-report-web-${{ github.run_id }}
+          path: packages/Webkul/Admin/allure-report-web
+          retention-days: 7
+
+
+  # =============================================================
+  # Generate Mobile Allure Report
+  # =============================================================
+
+  mobile_allure_report:
+    if: always()
+    needs: admin_playwright_test
+
+    runs-on: ubuntu-latest
+
+    name: Admin | Generate Mobile Allure Report
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.13.1"
+
+      - name: Install Allure Commandline
+        run: npm install -D allure-commandline
+
+      # ---------------------------------------------------------
+      # Download all 10 Mobile shard results
+      # ---------------------------------------------------------
+
+      - name: Download Mobile Allure Results
+        uses: actions/download-artifact@v4
+        with:
+          pattern: allure-mobile-chrome-shard-*
+          path: packages/Webkul/Admin/allure-results-mobile
+          merge-multiple: true
+
+      # ---------------------------------------------------------
+      # Generate Mobile Allure Report
+      # ---------------------------------------------------------
+
+      - name: Generate Mobile Allure Report
+        run: |
+          npx allure generate \
+            packages/Webkul/Admin/allure-results-mobile \
+            --clean \
+            -o packages/Webkul/Admin/allure-report-mobile
+
+      # ---------------------------------------------------------
+      # Upload Mobile Allure Report
+      # ---------------------------------------------------------
+
+      - name: Upload Mobile Allure Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-report-mobile-${{ github.run_id }}
+          path: packages/Webkul/Admin/allure-report-mobile
+          retention-days: 7

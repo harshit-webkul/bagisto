@@ -32,15 +32,16 @@ export default defineConfig({
     reportSlowTests: null,
 
     reporter: [
-        ["list"],
-
-        [
-            "html",
-            {
-                outputFolder: "./playwright-report",
-            },
-        ],
+    ["list"],
+    [
+        "allure-playwright",
+        {
+            resultsDir:
+                process.env.ALLURE_RESULTS_DIR ||
+                "./allure-results",
+        },
     ],
+],
 
     use: {
         baseURL: `${process.env.APP_URL}/`.replace(/\/+$/, "/"),
@@ -52,7 +53,20 @@ export default defineConfig({
     projects: [
         {
             name: "chromium",
-            use: { ...devices["Desktop Chrome"] },
+            use: {
+                ...devices["Desktop Chrome"],
+            },
+        },
+
+        {
+            name: "mobile-chrome",
+            use: {
+                ...devices["Pixel 5"],
+                viewport: {
+                    width: 375,
+                    height: 812,
+                },
+            },
         },
     ],
 });
