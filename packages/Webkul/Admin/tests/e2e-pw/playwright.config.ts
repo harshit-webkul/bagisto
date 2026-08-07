@@ -10,14 +10,18 @@ export const TESTS_ROOT_PATH = __dirname;
 export const STATE_DIR_PATH = `${TESTS_ROOT_PATH}/.state/`;
 export const ADMIN_AUTH_STATE_PATH = `${STATE_DIR_PATH}/admin-auth.json`;
 
-dotenv.config({ path: path.resolve(__dirname, "../../../../../.env") });
+dotenv.config({
+    path: path.resolve(__dirname, "../../../../../.env"),
+});
 
 export default defineConfig({
     testDir: "./tests",
 
     timeout: 60 * 1000,
 
-    expect: { timeout: 20 * 1000 },
+    expect: {
+        timeout: 20 * 1000,
+    },
 
     outputDir: "./test-results",
 
@@ -32,36 +36,54 @@ export default defineConfig({
     reportSlowTests: null,
 
     reporter: [
-    ["list"],
-    [
-        "allure-playwright",
-        {
-            resultsDir:
-                process.env.ALLURE_RESULTS_DIR ||
-                "./allure-results",
-        },
+        ["list"],
+
+        [
+            "allure-playwright",
+            {
+                resultsDir:
+                    process.env.ALLURE_RESULTS_DIR ||
+                    "./allure-results",
+            },
+        ],
     ],
-],
 
     use: {
         baseURL: `${process.env.APP_URL}/`.replace(/\/+$/, "/"),
-        screenshot: { mode: "only-on-failure", fullPage: true },
+
+        screenshot: {
+            mode: "only-on-failure",
+            fullPage: true,
+        },
+
         video: "retain-on-failure",
+
         trace: "retain-on-failure",
     },
 
     projects: [
+        // =====================================================
+        // Desktop Chrome
+        // =====================================================
+
         {
             name: "chromium",
+
             use: {
                 ...devices["Desktop Chrome"],
             },
         },
 
+        // =====================================================
+        // Mobile Chrome
+        // =====================================================
+
         {
             name: "mobile-chrome",
+
             use: {
                 ...devices["Pixel 5"],
+
                 viewport: {
                     width: 375,
                     height: 812,

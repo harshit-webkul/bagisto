@@ -1,6 +1,9 @@
+
 name: Admin | Playwright Tests
 
-on: [push, pull_request]
+on:
+  push:
+  pull_request:
 
 permissions:
   contents: read
@@ -9,33 +12,65 @@ env:
   FORCE_COLOR: 1
 
 jobs:
+
+  # =============================================================
+  # PLAYWRIGHT TESTS
+  # 10 Web Shards + 10 Mobile Shards = 20 Parallel Jobs
+  # =============================================================
+
   admin_playwright_test:
+
     runs-on: ${{ matrix.operating-systems }}
 
     strategy:
       fail-fast: false
+
       matrix:
-        operating-systems: [ubuntu-latest]
-        php-versions: ["8.3"]
-        node-version: ["22.13.1"]
 
-        browser: [chromium, mobile-chrome]
+        operating-systems:
+          - ubuntu-latest
 
-        shard-index: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-        shard-total: [10]
+        php-versions:
+          - "8.3"
+
+        node-version:
+          - "22.13.1"
+
+        browser:
+          - chromium
+          - mobile-chrome
+
+        shard-index:
+          - 1
+          - 2
+          - 3
+          - 4
+          - 5
+          - 6
+          - 7
+          - 8
+          - 9
+          - 10
+
+        shard-total:
+          - 10
 
     name: >
       Admin | ${{ matrix.browser }} |
       Shard ${{ matrix.shard-index }} Of ${{ matrix.shard-total }}
 
     services:
+
       mysql:
         image: mysql:8.0
+
         env:
           MYSQL_ROOT_PASSWORD: root
           MYSQL_DATABASE: bagisto
+
         ports:
           - 3306
+
         options: >-
           --health-cmd="mysqladmin ping"
           --health-interval=10s
@@ -43,25 +78,89 @@ jobs:
           --health-retries=5
 
     steps:
+
+      # =========================================================
+      # Checkout
+      # =========================================================
+
       - name: Checkout
         uses: actions/checkout@v4
 
+
+      # =========================================================
+      # Setup PHP
+      # =========================================================
+
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
+
         with:
           php-version: ${{ matrix.php-versions }}
-          extensions: curl, fileinfo, gd, intl, mbstring, openssl, pdo, pdo_mysql, tokenizer, zip
+
+          extensions: >
+            curl,
+            fileinfo,
+            gd,
+            intl,
+            mbstring,
+            openssl,
+            pdo,
+            pdo_mysql,
+            tokenizer,
+            zip
+
           ini-values: error_reporting=E_ALL
+
           tools: composer:v2
+
+
+      # =========================================================
+      # Setup Node.js
+      # =========================================================
 
       - name: Set Up Node.js
         uses: actions/setup-node@v4
+
         with:
           node-version: ${{ matrix.node-version }}
 
+
+      # =========================================================
+      # Install Node.js Dependencies
+      # =========================================================
+
       - name: Install Node.js Dependencies
-        run: npm install
+        run: npm ci
         working-directory: packages/Webkul/Admin
+
+
+      # =========================================================
+      # Install Allure Playwright
+      #
+      # package.json/package-lock.json are NOT modified
+      # =========================================================
+
+      - name: Install Allure Playwright
+        run: |
+          npm install \
+            --no-save \
+            --no-package-lock \
+            allure-playwright
+        working-directory: packages/Webkul/Admin
+
+
+      # =========================================================
+      # Verify Allure Playwright
+      # =========================================================
+
+      - name: Verify Allure Playwright
+        run: npm ls allure-playwright
+        working-directory: packages/Webkul/Admin
+
+
+      # =========================================================
+      # Install Playwright Browsers
+      # =========================================================
 
       - name: Install Playwright Browsers
         run: |
@@ -69,196 +168,345 @@ jobs:
           npx playwright install --with-deps chromium
         working-directory: packages/Webkul/Admin
 
+
+      # =========================================================
+      # Laravel Environment
+      # =========================================================
+
       - name: Setting Environment
         run: |
+
           cp .env.example .env
 
           sed -i "s|^\(DB_HOST=\s*\).*$|\1127.0.0.1|" .env
+
           sed -i "s|^\(DB_PORT=\s*\).*$|\1${{ job.services.mysql.ports['3306'] }}|" .env
+
           sed -i "s|^\(DB_DATABASE=\s*\).*$|\1bagisto|" .env
+
           sed -i "s|^\(DB_USERNAME=\s*\).*$|\1root|" .env
+
           sed -i "s|^\(DB_PASSWORD=\s*\).*$|\1root|" .env
+
           sed -i "s|^\(APP_DEBUG=\s*\).*$|\1false|" .env
+
           sed -i "s|^\(APP_URL=\s*\).*$|\1http://127.0.0.1:8000|" .env
 
           cat .env
 
+
+      # =========================================================
+      # Install Composer Dependencies
+      # =========================================================
+
       - name: Install Composer Dependencies
         run: composer install
+
+
+      # =========================================================
+      # Bagisto Installation
+      # =========================================================
 
       - name: Running Bagisto Installer
         run: php artisan bagisto:install --no-interaction
 
+
+      # =========================================================
+      # Seed Product Table
+      # =========================================================
+
       - name: Seed Product Table
-        run: php artisan db:seed --class="Webkul\\Installer\\Database\\Seeders\\ProductTableSeeder"
+        run: |
+          php artisan db:seed \
+            --class="Webkul\\Installer\\Database\\Seeders\\ProductTableSeeder"
+
+
+      # =========================================================
+      # Product Indexing
+      # =========================================================
 
       - name: Indexing Product Table
         run: php artisan indexer:index --mode=full
 
+
+      # =========================================================
+      # Start Laravel Server
+      # =========================================================
+
       - name: Start Laravel server
         run: |
-          php artisan serve --host=0.0.0.0 --port=8000 > server.log 2>&1 &
+
+          php artisan serve \
+            --host=0.0.0.0 \
+            --port=8000 \
+            > server.log 2>&1 &
 
           echo "Waiting for server to start..."
 
           timeout 30 bash -c \
             'until curl -s http://127.0.0.1:8000 > /dev/null; do sleep 1; done'
 
-      # ---------------------------------------------------------
+          echo "Laravel server is running."
+
+
+      # =========================================================
       # Run Playwright Tests
-      # ---------------------------------------------------------
+      # =========================================================
 
       - name: Run Playwright Tests
-        if: always()
+
         env:
           BASE_URL: "http://127.0.0.1:8000"
           ALLURE_RESULTS_DIR: "./allure-results"
+
         run: |
+
           npx playwright test \
             --config=tests/e2e-pw/playwright.config.ts \
             --project=${{ matrix.browser }} \
             --shard=${{ matrix.shard-index }}/${{ matrix.shard-total }}
+
         working-directory: packages/Webkul/Admin
 
-      # ---------------------------------------------------------
-      # Upload Allure Results
-      # ---------------------------------------------------------
+
+      # =========================================================
+      # Upload Allure Raw Results
+      # =========================================================
 
       - name: Upload Allure Results
+
         if: always()
+
         uses: actions/upload-artifact@v4
+
         with:
+
           name: allure-${{ matrix.browser }}-shard-${{ matrix.shard-index }}
+
           path: packages/Webkul/Admin/allure-results
+
+          if-no-files-found: warn
+
           retention-days: 7
 
-      # ---------------------------------------------------------
+
+      # =========================================================
       # Upload Playwright Debug Results
-      # ---------------------------------------------------------
+      # =========================================================
 
       - name: Upload Playwright Test Results
+
         if: always()
+
         uses: actions/upload-artifact@v4
+
         with:
+
           name: playwright-${{ matrix.browser }}-shard-${{ matrix.shard-index }}
+
           path: |
             packages/Webkul/Admin/tests/e2e-pw/test-results
-            storage/logs/laravel.log
             packages/Webkul/Admin/server.log
+            storage/logs/laravel.log
+
+          if-no-files-found: warn
+
           retention-days: 7
 
 
   # =============================================================
-  # Generate Web Allure Report
+  # WEB ALLURE REPORT
+  # Combines all 10 Chromium shards
   # =============================================================
 
   web_allure_report:
+
     if: always()
-    needs: admin_playwright_test
+
+    needs:
+      - admin_playwright_test
 
     runs-on: ubuntu-latest
 
-    name: Admin | Generate Web Allure Report
+    name: Admin | Web | Allure Report
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+
+
+      # =========================================================
+      # Setup Node.js
+      # =========================================================
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
+
         with:
           node-version: "22.13.1"
 
-      - name: Install Allure Commandline
-        run: npm install -D allure-commandline
 
-      # ---------------------------------------------------------
-      # Download all 10 Web shard results
-      # ---------------------------------------------------------
+      # =========================================================
+      # Install Allure Commandline
+      # =========================================================
+
+      - name: Install Allure Commandline
+        run: |
+          npm install -g allure-commandline
+
+
+      # =========================================================
+      # Download Web Allure Results
+      # =========================================================
 
       - name: Download Web Allure Results
+
         uses: actions/download-artifact@v4
+
         with:
+
           pattern: allure-chromium-shard-*
-          path: packages/Webkul/Admin/allure-results-web
+
+          path: allure-results-web
+
           merge-multiple: true
 
-      # ---------------------------------------------------------
+
+      # =========================================================
       # Generate Web Allure Report
-      # ---------------------------------------------------------
+      # =========================================================
 
       - name: Generate Web Allure Report
-        run: |
-          npx allure generate \
-            packages/Webkul/Admin/allure-results-web \
-            --clean \
-            -o packages/Webkul/Admin/allure-report-web
 
-      # ---------------------------------------------------------
+        run: |
+
+          if [ -d "allure-results-web" ] && [ "$(find allure-results-web -type f | wc -l)" -gt 0 ]; then
+
+            allure generate \
+              allure-results-web \
+              --clean \
+              -o allure-report-web
+
+          else
+
+            echo "No Web Allure results found."
+
+          fi
+
+
+      # =========================================================
       # Upload Web Allure Report
-      # ---------------------------------------------------------
+      # =========================================================
 
       - name: Upload Web Allure Report
+
+        if: always()
+
         uses: actions/upload-artifact@v4
+
         with:
+
           name: allure-report-web-${{ github.run_id }}
-          path: packages/Webkul/Admin/allure-report-web
+
+          path: allure-report-web
+
+          if-no-files-found: warn
+
           retention-days: 7
 
 
   # =============================================================
-  # Generate Mobile Allure Report
+  # MOBILE ALLURE REPORT
+  # Combines all 10 Mobile Chrome shards
   # =============================================================
 
   mobile_allure_report:
+
     if: always()
-    needs: admin_playwright_test
+
+    needs:
+      - admin_playwright_test
 
     runs-on: ubuntu-latest
 
-    name: Admin | Generate Mobile Allure Report
+    name: Admin | Mobile | Allure Report
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+
+
+      # =========================================================
+      # Setup Node.js
+      # =========================================================
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
+
         with:
           node-version: "22.13.1"
 
-      - name: Install Allure Commandline
-        run: npm install -D allure-commandline
 
-      # ---------------------------------------------------------
-      # Download all 10 Mobile shard results
-      # ---------------------------------------------------------
+      # =========================================================
+      # Install Allure Commandline
+      # =========================================================
+
+      - name: Install Allure Commandline
+        run: |
+          npm install -g allure-commandline
+
+
+      # =========================================================
+      # Download Mobile Allure Results
+      # =========================================================
 
       - name: Download Mobile Allure Results
+
         uses: actions/download-artifact@v4
+
         with:
+
           pattern: allure-mobile-chrome-shard-*
-          path: packages/Webkul/Admin/allure-results-mobile
+
+          path: allure-results-mobile
+
           merge-multiple: true
 
-      # ---------------------------------------------------------
+
+      # =========================================================
       # Generate Mobile Allure Report
-      # ---------------------------------------------------------
+      # =========================================================
 
       - name: Generate Mobile Allure Report
-        run: |
-          npx allure generate \
-            packages/Webkul/Admin/allure-results-mobile \
-            --clean \
-            -o packages/Webkul/Admin/allure-report-mobile
 
-      # ---------------------------------------------------------
+        run: |
+
+          if [ -d "allure-results-mobile" ] && [ "$(find allure-results-mobile -type f | wc -l)" -gt 0 ]; then
+
+            allure generate \
+              allure-results-mobile \
+              --clean \
+              -o allure-report-mobile
+
+          else
+
+            echo "No Mobile Allure results found."
+
+          fi
+
+
+      # =========================================================
       # Upload Mobile Allure Report
-      # ---------------------------------------------------------
+      # =========================================================
 
       - name: Upload Mobile Allure Report
+
+        if: always()
+
         uses: actions/upload-artifact@v4
+
         with:
+
           name: allure-report-mobile-${{ github.run_id }}
-          path: packages/Webkul/Admin/allure-report-mobile
+
+          path: allure-report-mobile
+
+          if-no-files-found: warn
+
           retention-days: 7
