@@ -6,6 +6,8 @@ on:
 
 permissions:
   contents: read
+  pages: write
+  id-token: write
 
 env:
   FORCE_COLOR: 1
@@ -135,8 +137,6 @@ jobs:
 
       # =========================================================
       # Install Allure Playwright
-      #
-      # package.json/package-lock.json are NOT modified
       # =========================================================
 
       - name: Install Allure Playwright
@@ -363,6 +363,10 @@ jobs:
 
     name: Admin | Web | Allure Report
 
+    permissions:
+      pages: write
+      id-token: write
+
     steps:
 
       # =========================================================
@@ -512,6 +516,63 @@ jobs:
           retention-days: 7
 
 
+      # =========================================================
+      # GitHub Pages
+      # =========================================================
+
+      - name: Setup GitHub Pages
+
+        uses: actions/configure-pages@v5
+
+
+      # =========================================================
+      # Upload Report to GitHub Pages
+      # =========================================================
+
+      - name: Upload Web Allure Report to Pages
+
+        uses: actions/upload-pages-artifact@v3
+
+        with:
+          path: allure-report-web
+
+
+      # =========================================================
+      # Deploy Report to GitHub Pages
+      # =========================================================
+
+      - name: Deploy Web Allure Report
+
+        id: deployment
+
+        uses: actions/deploy-pages@v4
+
+
+      # =========================================================
+      # Add Allure URL to GitHub Actions Summary
+      # =========================================================
+
+      - name: Add Web Allure URL to Summary
+
+        run: |
+
+          echo "## 🎭 Web Allure Report" >> $GITHUB_STEP_SUMMARY
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          echo "### ✅ Allure Report Generated Successfully" >> $GITHUB_STEP_SUMMARY
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          echo "[🔗 Open Web Allure Report](${{ steps.deployment.outputs.page_url }})" >> $GITHUB_STEP_SUMMARY
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          echo "Report URL:" >> $GITHUB_STEP_SUMMARY
+
+          echo "${{ steps.deployment.outputs.page_url }}" >> $GITHUB_STEP_SUMMARY
+
+
   # =============================================================
   # MOBILE ALLURE REPORT
   # Combines all 10 Mobile Chrome shards
@@ -580,7 +641,7 @@ jobs:
 
 
       # =========================================================
-      # Verify Downloaded Mobile Results
+      # Verify Mobile Allure Results
       # =========================================================
 
       - name: Verify Mobile Allure Results
